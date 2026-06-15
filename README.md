@@ -50,7 +50,7 @@ These embeddings act as a *custom knowledge base* for the teaching assistant.
 1. Clone the repository:
 
 bash
-git clone https://github.com/Anushka7237/RAG-AI-Teaching-assistant.git
+git clone https://github.com/Adarsh-Thakur12/rag-based-ai-teaching-assistant
 cd housing-price-prediction
 
 
