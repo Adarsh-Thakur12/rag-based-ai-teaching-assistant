@@ -51,8 +51,6 @@ These embeddings act as a *custom knowledge base* for the teaching assistant.
 
 bash
 git clone https://github.com/Adarsh-Thakur12/rag-based-ai-teaching-assistant
-cd housing-price-prediction
-
 
 2. Create a virtual environment (recommended):
 
