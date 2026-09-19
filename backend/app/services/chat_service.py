@@ -82,3 +82,33 @@ def get_messages(
     )
 
     return response.data
+def get_recent_messages(
+    session_id: str,
+    user_id: str,
+    limit: int = 6
+):
+    session = get_session(
+        session_id=session_id,
+        user_id=user_id
+    )
+
+    if not session:
+        return None
+
+    response = (
+        supabase
+        .table("chat_messages")
+        .select("role, content, created_at")
+        .eq("session_id", session_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+
+    messages = response.data or []
+
+    # Database returns newest first.
+    # Reverse so the LLM receives chronological order.
+    messages.reverse()
+
+    return messages

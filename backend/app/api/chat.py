@@ -5,6 +5,7 @@ from app.api.dependencies import get_current_user
 from app.services.chat_service import (
     create_chat_session,
     get_messages,
+    get_recent_messages,
     get_session,
     save_message
 )
@@ -22,6 +23,7 @@ class ChatRequest(BaseModel):
     question: str
     lecture_id: str | None = None
     session_id: str | None = None
+    
 
 
 @router.post("")
@@ -49,19 +51,16 @@ def chat(
             )
 
         session_id = session["id"]
+        lecture_id = session["lecture_id"]
 
-        # Make sure the requested lecture matches
-        # the lecture associated with the session.
         if (
             request.lecture_id is not None
-            and session["lecture_id"] != request.lecture_id
+            and request.lecture_id != lecture_id
         ):
             raise HTTPException(
                 status_code=400,
                 detail="Lecture does not match the chat session"
             )
-
-        lecture_id = session["lecture_id"]
 
     else:
 
@@ -74,7 +73,21 @@ def chat(
         lecture_id = request.lecture_id
 
     # --------------------------------------------------
-    # Save user message
+    # Load previous conversation BEFORE saving
+    # current user message
+    # --------------------------------------------------
+
+    history = get_recent_messages(
+        session_id=session_id,
+        user_id=user_id,
+        limit=6
+    )
+
+    if history is None:
+        history = []
+
+    # --------------------------------------------------
+    # Save current user message
     # --------------------------------------------------
 
     save_message(
@@ -133,12 +146,13 @@ Timestamp:
     context = "\n".join(context_parts)
 
     # --------------------------------------------------
-    # Generate answer
+    # Generate answer using previous conversation
     # --------------------------------------------------
 
     answer = generate_answer(
         question=request.question,
-        context=context
+        context=context,
+        history=history
     )
 
     # --------------------------------------------------
