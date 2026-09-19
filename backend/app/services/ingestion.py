@@ -1,11 +1,27 @@
 import os
 from pathlib import Path
 
+from app.database.supabase import supabase
+
 from app.services.video_processor import convert_video_to_mp3
 from app.services.transcription import transcribe_audio
 from app.services.chunking import create_chunks
 from app.services.embeddings import create_embedding
 from app.services.chunk_storage import store_chunks
+
+
+def update_lecture_status(
+    lecture_id: str,
+    user_id: str,
+    status: str
+):
+    supabase.table("lectures").update({
+        "status": status
+    }).eq(
+        "id", lecture_id
+    ).eq(
+        "user_id", user_id
+    ).execute()
 
 
 def process_lecture(
@@ -15,43 +31,123 @@ def process_lecture(
 ):
     video_path = Path(video_path)
 
-    # 1. Convert video to MP3
     audio_path = video_path.with_suffix(".mp3")
 
-    convert_video_to_mp3(
-        str(video_path),
-        str(audio_path)
-    )
+    try:
 
-    # 2. Transcribe audio using Whisper
-    transcription = transcribe_audio(
-        str(audio_path)
-    )
+        # -------------------------------------------------
+        # 1. Start processing
+        # -------------------------------------------------
 
-    # 3. Create timestamped chunks
-    chunks = create_chunks(
-        transcription
-    )
-
-    # 4. Generate embedding for every chunk
-    for chunk in chunks:
-        chunk["embedding"] = create_embedding(
-            chunk["content"]
+        update_lecture_status(
+            lecture_id=lecture_id,
+            user_id=user_id,
+            status="processing"
         )
 
-    # 5. Store chunks + embeddings in Supabase
-    stored_chunks = store_chunks(
-        lecture_id=lecture_id,
-        user_id=user_id,
-        chunks=chunks
-    )
+        # -------------------------------------------------
+        # 2. Convert video to MP3
+        # -------------------------------------------------
 
-    # 6. Remove temporary MP3
-    if audio_path.exists():
-        os.remove(audio_path)
+        convert_video_to_mp3(
+            str(video_path),
+            str(audio_path)
+        )
 
-    return {
-        "lecture_id": lecture_id,
-        "chunks_created": len(chunks),
-        "chunks_stored": len(stored_chunks)
-    }
+        # -------------------------------------------------
+        # 3. Transcribe audio using Whisper
+        # -------------------------------------------------
+
+        update_lecture_status(
+            lecture_id=lecture_id,
+            user_id=user_id,
+            status="transcribing"
+        )
+
+        transcription_data = transcribe_audio(
+            str(audio_path)
+        )
+        transcription = transcription_data["result"]
+
+        # -------------------------------------------------
+        # 4. Save video duration
+        # -------------------------------------------------
+
+        duration = transcription_data["duration"]
+
+        if duration is not None:
+
+            supabase.table("lectures").update({
+                "duration_seconds": duration
+            }).eq(
+                "id", lecture_id
+            ).eq(
+                "user_id", user_id
+            ).execute()
+
+        # -------------------------------------------------
+        # 5. Create timestamped chunks
+        # -------------------------------------------------
+
+        chunks = create_chunks(
+            transcription
+        )
+
+        # -------------------------------------------------
+        # 6. Generate embeddings
+        # -------------------------------------------------
+
+        update_lecture_status(
+            lecture_id=lecture_id,
+            user_id=user_id,
+            status="embedding"
+        )
+
+        for chunk in chunks:
+
+            chunk["embedding"] = create_embedding(
+                chunk["content"]
+            )
+
+        # -------------------------------------------------
+        # 7. Store chunks + embeddings
+        # -------------------------------------------------
+
+        stored_chunks = store_chunks(
+            lecture_id=lecture_id,
+            user_id=user_id,
+            chunks=chunks
+        )
+
+        # -------------------------------------------------
+        # 8. Mark lecture as ready
+        # -------------------------------------------------
+
+        update_lecture_status(
+            lecture_id=lecture_id,
+            user_id=user_id,
+            status="ready"
+        )
+
+        return {
+            "lecture_id": lecture_id,
+            "chunks_created": len(chunks),
+            "chunks_stored": len(stored_chunks),
+            "duration_seconds": duration
+        }
+
+    except Exception:
+
+        update_lecture_status(
+            lecture_id=lecture_id,
+            user_id=user_id,
+            status="failed"
+        )
+
+        raise
+
+    finally:
+
+        # Always remove temporary MP3
+        if audio_path.exists():
+            os.remove(audio_path)

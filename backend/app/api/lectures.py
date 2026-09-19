@@ -38,13 +38,7 @@ def process_uploaded_lecture(
             user_id=user_id
         )
 
-        supabase.table("lectures").update({
-            "status": "ready"
-        }).eq(
-            "id", lecture_id
-        ).eq(
-            "user_id", user_id
-        ).execute()
+       
 
     except Exception as error:
 
@@ -115,7 +109,7 @@ async def upload_lecture(
             "user_id": user_id,
             "title": title,
             "file_path": str(video_path),
-            "status": "processing"
+            "status": "uploaded"
         }).execute()
 
         if not response.data:
@@ -131,7 +125,7 @@ async def upload_lecture(
         return {
             "lecture_id": lecture_id,
             "title": title,
-            "status": "processing"
+            "status": "uploaded"
         }
 
     except Exception as error:
