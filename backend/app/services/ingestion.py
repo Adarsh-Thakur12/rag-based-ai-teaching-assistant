@@ -10,13 +10,14 @@ from app.services.embeddings import create_embedding
 from app.services.chunk_storage import store_chunks
 
 
-def update_lecture_status(
+def update_lecture_error(
     lecture_id: str,
     user_id: str,
-    status: str
+    error_message: str
 ):
     supabase.table("lectures").update({
-        "status": status
+        "status": "failed",
+        "error_message": error_message
     }).eq(
         "id", lecture_id
     ).eq(
@@ -136,12 +137,12 @@ def process_lecture(
             "duration_seconds": duration
         }
 
-    except Exception:
+    except Exception as error:
 
-        update_lecture_status(
+        update_lecture_error(
             lecture_id=lecture_id,
             user_id=user_id,
-            status="failed"
+            error_message=str(error)
         )
 
         raise

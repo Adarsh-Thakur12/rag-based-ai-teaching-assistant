@@ -153,7 +153,7 @@ def get_lectures(
         supabase
         .table("lectures")
         .select(
-            "id, title, status, duration_seconds, created_at"
+            "id, title, status, duration_seconds, error_message, created_at"
         )
         .eq("user_id", user_id)
         .order("created_at", desc=True)
@@ -180,7 +180,7 @@ def get_lecture(
         supabase
         .table("lectures")
         .select(
-            "id, title, status, duration_seconds, created_at"
+            "id, title, status, duration_seconds, error_message, created_at"
         )
         .eq("id", lecture_id)
         .eq("user_id", user_id)
