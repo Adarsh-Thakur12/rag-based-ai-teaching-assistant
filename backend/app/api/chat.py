@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.api.dependencies import get_current_user
 from app.services.retrieval import retrieve_chunks
 from app.services.generation import generate_answer
 
@@ -10,16 +11,19 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 class ChatRequest(BaseModel):
     question: str
-    user_id: str
     lecture_id: str | None = None
 
 
 @router.post("")
-def chat(request: ChatRequest):
+def chat(
+    request: ChatRequest,
+    current_user=Depends(get_current_user)
+):
+    user_id = str(current_user.id)
 
     chunks = retrieve_chunks(
         query=request.question,
-        user_id=request.user_id,
+        user_id=user_id,
         lecture_id=request.lecture_id,
         top_k=5
     )
