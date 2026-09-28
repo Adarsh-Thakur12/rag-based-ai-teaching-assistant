@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from app.database.supabase import supabase
 
 from app.api.dependencies import get_current_user
 from app.services.chat_service import (
@@ -186,6 +187,32 @@ Timestamp:
         "sources": sources
     }
 
+@router.get("/sessions")
+def get_chat_sessions(
+    lecture_id: str | None = None,
+    current_user=Depends(get_current_user)
+):
+    user_id = str(current_user.id)
+
+    query = (
+        supabase
+        .table("chat_sessions")
+        .select("id, user_id, lecture_id, created_at")
+        .eq("user_id", user_id)
+    )
+
+    if lecture_id is not None:
+        query = query.eq("lecture_id", lecture_id)
+
+    response = (
+        query
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return {
+        "sessions": response.data or []
+    }
 
 @router.get("/sessions/{session_id}")
 def get_chat_history(
