@@ -55,35 +55,22 @@ export default function ChatPage() {
   const [historyLoading, setHistoryLoading] =
     useState(true);
 
+  const [sessions, setSessions] =
+  useState<ChatSession[]>([]);
+
   const [error, setError] =
     useState("");
-
-  useEffect(() => {
-    async function initializeChat() {
+  
+  async function loadChatSession(
+      selectedSessionId: string
+    ) {
       try {
         setHistoryLoading(true);
         setError("");
 
-        const data = await getChatSessions(
-          lectureId
-        );
-
-        const sessions: ChatSession[] =
-          data.sessions || [];
-
-        if (sessions.length === 0) {
-          setSessionId(null);
-          setMessages([]);
-          return;
-        }
-
-        const latestSession = sessions[0];
-
-        setSessionId(latestSession.id);
-
         const history =
           await getChatHistory(
-            latestSession.id
+            selectedSessionId
           );
 
         const restoredMessages: Message[] =
@@ -97,7 +84,9 @@ export default function ChatPage() {
             })
           );
 
+        setSessionId(selectedSessionId);
         setMessages(restoredMessages);
+        setSources([]);
       } catch (error) {
         setError(
           error instanceof Error
@@ -109,7 +98,46 @@ export default function ChatPage() {
       }
     }
 
-    initializeChat();
+  useEffect(() => {
+  async function initializeChat() {
+    try {
+      setHistoryLoading(true);
+      setError("");
+
+      const data = await getChatSessions(
+        lectureId
+      );
+
+      const loadedSessions: ChatSession[] =
+        data.sessions || [];
+
+      setSessions(loadedSessions);
+
+      if (loadedSessions.length === 0) {
+        setSessionId(null);
+        setMessages([]);
+        return;
+      }
+
+      const latestSession =
+        loadedSessions[0];
+
+      await loadChatSession(
+        latestSession.id
+      );
+
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load conversation"
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  initializeChat();
   }, [lectureId]);
 
   async function handleSubmit(
@@ -148,6 +176,15 @@ export default function ChatPage() {
       if (response.session_id) {
         setSessionId(
           response.session_id
+        );
+
+        const sessionData =
+          await getChatSessions(
+            lectureId
+          );
+
+        setSessions(
+          sessionData.sessions || []
         );
       }
 
@@ -214,12 +251,67 @@ export default function ChatPage() {
             </p>
           </div>
 
-          <button
-            onClick={handleNewChat}
-            className="rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
-          >
-            New Chat
-          </button>
+          
+
+        </div>
+        <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
+
+  {/* Chat History */}
+
+        <div className="rounded-xl bg-white p-4 shadow">
+
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">
+              Chats
+            </h2>
+
+            <button
+              onClick={handleNewChat}
+              className="text-sm text-gray-500 hover:text-black"
+            >
+              + New
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-2">
+
+            {sessions.length === 0 && (
+              <p className="text-sm text-gray-400">
+                No previous chats
+              </p>
+            )}
+
+            {sessions.map((session, index) => (
+              <button
+                key={session.id}
+                onClick={() =>
+                  loadChatSession(session.id)
+                }
+                className={`w-full rounded-lg p-3 text-left text-sm ${
+                  session.id === sessionId
+                    ? "bg-black text-white"
+                    : "bg-gray-50 hover:bg-gray-100"
+                }`}
+              >
+                <p className="font-medium">
+                  Chat {sessions.length - index}
+                </p>
+
+                <p
+                  className={`mt-1 text-xs ${
+                    session.id === sessionId
+                      ? "text-gray-300"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {new Date(
+                    session.created_at
+                  ).toLocaleString()}
+                </p>
+              </button>
+            ))}
+
+          </div>
 
         </div>
 
@@ -397,7 +489,7 @@ export default function ChatPage() {
 
           </div>
         )}
-
+      </div>
       </div>
     </main>
   );

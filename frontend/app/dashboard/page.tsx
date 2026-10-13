@@ -10,6 +10,7 @@ import {
 import {
   getLectures,
   uploadLecture,
+  deleteLecture,
 } from "@/lib/api";
 
 type Lecture = {
@@ -150,7 +151,31 @@ export default function DashboardPage() {
       setUploading(false);
     }
   }
+  async function handleDeleteLecture(
+    lectureId: string
+  ) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this lecture?"
+    );
 
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      await deleteLecture(lectureId);
+
+      await loadLectures();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete lecture"
+      );
+    }
+  }
   function formatDuration(
     duration: number | null
   ) {
@@ -170,29 +195,50 @@ export default function DashboardPage() {
     return `${minutes}m ${seconds}s`;
   }
 
-  function getStatusLabel(status: string) {
-    switch (status) {
-      case "uploaded":
-        return "Uploaded";
+  function getStatusStyle(status: string) {
+  switch (status) {
+    case "uploaded":
+      return {
+        label: "Uploaded",
+        className: "bg-gray-100 text-gray-700",
+      };
 
-      case "processing":
-        return "Processing";
+    case "processing":
+      return {
+        label: "Processing",
+        className: "bg-blue-100 text-blue-700",
+      };
 
-      case "transcribing":
-        return "Transcribing";
+    case "transcribing":
+      return {
+        label: "Transcribing",
+        className: "bg-blue-100 text-blue-700",
+      };
 
-      case "embedding":
-        return "Creating embeddings";
+    case "embedding":
+      return {
+        label: "Creating embeddings",
+        className: "bg-blue-100 text-blue-700",
+      };
 
-      case "ready":
-        return "Ready";
+    case "ready":
+      return {
+        label: "Ready",
+        className: "bg-green-100 text-green-700",
+      };
 
-      case "failed":
-        return "Failed";
+    case "failed":
+      return {
+        label: "Failed",
+        className: "bg-red-100 text-red-700",
+      };
 
-      default:
-        return status;
-    }
+    default:
+      return {
+        label: status,
+        className: "bg-gray-100 text-gray-700",
+      };
+  }
   }
 
   return (
@@ -363,8 +409,10 @@ export default function DashboardPage() {
                       {lecture.title}
                     </h3>
 
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
-                      {getStatusLabel(lecture.status)}
+                    <span
+                      className={`rounded-full px-3 py-1 text-sm ${getStatusStyle(lecture.status).className}`}
+                    >
+                      {getStatusStyle(lecture.status).label}
                     </span>
 
                   </div>
@@ -394,19 +442,31 @@ export default function DashboardPage() {
                   {/* Ready */}
 
                   {lecture.status === "ready" && (
-                    <>
-                      <p className="mt-2 text-sm text-green-600">
-                        Lecture is ready for questions.
-                      </p>
+                  <>
+                    <p className="mt-2 text-sm text-green-600">
+                      Lecture is ready for questions.
+                    </p>
 
+                    <div className="mt-3 flex gap-2">
                       <a
                         href={`/chat/${lecture.id}`}
-                        className="mt-3 inline-block rounded-lg bg-black px-4 py-2 text-sm text-white"
+                        className="rounded-lg bg-black px-4 py-2 text-sm text-white"
                       >
                         Open Chat
                       </a>
-                    </>
-                  )}
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDeleteLecture(lecture.id)
+                        }
+                        className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
 
                   {/* Failed */}
 

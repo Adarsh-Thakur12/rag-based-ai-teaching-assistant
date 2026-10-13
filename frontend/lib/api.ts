@@ -188,3 +188,37 @@ export async function getChatSessions(
 
   return response.json();
 }
+export async function deleteLecture(
+  lectureId: string
+) {
+  const token = await getAccessToken();
+
+  const response = await fetch(
+    `${API_URL}/lectures/${lectureId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    let message =
+      `Failed to delete lecture (${response.status})`;
+
+    try {
+      const data = await response.json();
+
+      if (data.detail) {
+        message = data.detail;
+      }
+    } catch {
+      // Keep default error.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}
