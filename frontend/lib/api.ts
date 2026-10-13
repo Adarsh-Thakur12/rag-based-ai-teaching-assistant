@@ -222,3 +222,34 @@ export async function deleteLecture(
 
   return response.json();
 }
+
+export async function retryLecture(lectureId: string) {
+  const token = await getAccessToken();
+
+  const response = await fetch(
+    `${API_URL}/lectures/${lectureId}/retry`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    let message = `Failed to retry lecture (${response.status})`;
+
+    try {
+      const data = await response.json();
+      if (data.detail) {
+        message = data.detail;
+      }
+    } catch {
+      // Keep default error.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}

@@ -166,6 +166,113 @@ def get_lectures(
 
 
 # ---------------------------------------------------------
+# RETRY FAILED LECTURE
+# ---------------------------------------------------------
+
+@router.post("/{lecture_id}/retry")
+def retry_lecture(
+    lecture_id: str,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user)
+):
+    user_id = str(current_user.id)
+
+    # Find the lecture belonging to this user
+    response = (
+        supabase
+        .table("lectures")
+        .select("id, file_path, status")
+        .eq("id", lecture_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=404,
+            detail="Lecture not found"
+        )
+
+    lecture = response.data
+
+    # Only failed lectures can be retried
+    if lecture["status"] != "failed":
+        raise HTTPException(
+            status_code=409,
+            detail="Only failed lectures can be retried"
+        )
+
+    file_path = lecture.get("file_path")
+
+    if not file_path or not Path(file_path).is_file():
+        raise HTTPException(
+            status_code=400,
+            detail="Original video file not found. Please upload the lecture again."
+        )
+
+    # Atomically claim the failed lecture so concurrent
+    # retry requests cannot both schedule processing.
+    update_response = (
+        supabase
+        .table("lectures")
+        .update({
+            "status": "uploaded",
+            "error_message": None
+        })
+        .eq("id", lecture_id)
+        .eq("user_id", user_id)
+        .eq("status", "failed")
+        .execute()
+    )
+
+    if not update_response.data:
+        raise HTTPException(
+            status_code=409,
+            detail="Lecture status changed. Refresh and try again."
+        )
+
+    try:
+        # Remove any chunks left by an earlier partial attempt.
+        (
+            supabase
+            .table("chunks")
+            .delete()
+            .eq("lecture_id", lecture_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        background_tasks.add_task(
+            process_uploaded_lecture,
+            file_path,
+            lecture_id,
+            user_id
+        )
+
+    except Exception as error:
+        # Restore a visible failure state if scheduling setup fails.
+        supabase.table("lectures").update({
+            "status": "failed",
+            "error_message": str(error)
+        }).eq(
+            "id", lecture_id
+        ).eq(
+            "user_id", user_id
+        ).execute()
+
+        raise HTTPException(
+            status_code=500,
+            detail="Could not schedule lecture retry"
+        )
+
+    return {
+        "lecture_id": lecture_id,
+        "status": "uploaded",
+        "message": "Lecture retry scheduled successfully"
+    }
+
+# ---------------------------------------------------------
 # GET SINGLE LECTURE
 # ---------------------------------------------------------
 

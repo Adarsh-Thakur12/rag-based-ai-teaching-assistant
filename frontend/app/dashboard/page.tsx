@@ -8,9 +8,10 @@ import {
 } from "react";
 
 import {
-  getLectures,
-  uploadLecture,
   deleteLecture,
+  getLectures,
+  retryLecture,
+  uploadLecture,
 } from "@/lib/api";
 
 type Lecture = {
@@ -176,6 +177,31 @@ export default function DashboardPage() {
       );
     }
   }
+
+  async function handleRetryLecture(lectureId: string) {
+    const confirmed = window.confirm(
+      "Retry processing this lecture?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      await retryLecture(lectureId);
+
+      await loadLectures();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to retry lecture"
+      );
+    }
+  }
+
   function formatDuration(
     duration: number | null
   ) {
@@ -470,12 +496,21 @@ export default function DashboardPage() {
 
                   {/* Failed */}
 
-                  {lecture.status === "failed" &&
-                    lecture.error_message && (
-                      <p className="mt-2 text-sm text-red-600">
-                        Error:{" "}
-                        {lecture.error_message}
+                  {lecture.status === "failed" && (
+                    <div className="mt-3">
+                    {lecture.error_message && (
+                      <p className="text-sm text-red-600">
+                        Error: {lecture.error_message}
                       </p>
+                    )}
+                    <button
+                    type="button"
+                    onClick={() => handleRetryLecture(lecture.id)}
+                    className="mt-3 rounded-lg border border-blue-300 px-4 py-2 text-sm text-blue-700 hover:bg-blue-50"
+                        >
+                          Retry Processing
+                        </button>
+                      </div>
                     )}
 
                   {/* Lecture ID */}
