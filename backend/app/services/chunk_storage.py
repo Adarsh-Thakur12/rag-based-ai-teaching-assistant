@@ -1,3 +1,4 @@
+
 from app.database.supabase import supabase
 
 
@@ -12,18 +13,30 @@ def store_chunks(
         embedding = chunk["embedding"]
 
         rows.append({
-            "lecture_id": lecture_id,
-            "user_id": user_id,
             "content": chunk["content"],
             "start_time": chunk["start_time"],
             "end_time": chunk["end_time"],
             "source_chunk_id": str(index),
-            "embedding": "[" + ",".join(map(str, embedding)) + "]"
+            "embedding": "[" + ",".join(
+                map(str, embedding)
+            ) + "]"
         })
 
-    if not rows:
-        return []
+    response = supabase.rpc(
+        "replace_lecture_chunks",
+        {
+            "p_lecture_id": lecture_id,
+            "p_user_id": user_id,
+            "p_chunks": rows
+        }
+    ).execute()
 
-    response = supabase.table("chunks").insert(rows).execute()
+    stored_count = response.data
 
-    return response.data
+    if stored_count != len(chunks):
+        raise RuntimeError(
+            f"Expected {len(chunks)} chunks, "
+            f"but stored {stored_count}"
+        )
+
+    return rows

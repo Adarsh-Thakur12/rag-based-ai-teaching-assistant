@@ -26,34 +26,65 @@ UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 
+def claim_lecture_processing(
+    lecture_id: str,
+    user_id: str
+) -> bool:
+    response = supabase.rpc(
+        "claim_lecture_processing",
+        {
+            "p_lecture_id": lecture_id,
+            "p_user_id": user_id
+        }
+    ).execute()
+
+    return response.data is True
+
+
 def process_uploaded_lecture(
     video_path: str,
     lecture_id: str,
     user_id: str
 ):
     try:
+        claimed = claim_lecture_processing(
+            lecture_id=lecture_id,
+            user_id=user_id
+        )
+
+        if not claimed:
+            print(
+                f"Skipping lecture {lecture_id}: "
+                "already claimed or not in uploaded state"
+            )
+            return
+
         process_lecture(
             video_path=video_path,
             lecture_id=lecture_id,
             user_id=user_id
         )
 
-       
+    except Exception:
+        import logging
 
-    except Exception as error:
-
-        print(
-            f"Lecture processing failed "
-            f"for {lecture_id}: {error}"
+        logging.exception(
+            "Lecture processing failed for %s",
+            lecture_id
         )
 
-        supabase.table("lectures").update({
-            "status": "failed"
-        }).eq(
-            "id", lecture_id
-        ).eq(
-            "user_id", user_id
-        ).execute()
+        try:
+            supabase.table("lectures").update({
+                "status": "failed"
+            }).eq(
+                "id", lecture_id
+            ).eq(
+                "user_id", user_id
+            ).execute()
+        except Exception:
+            logging.exception(
+                "Could not update lecture failure status"
+            )
 
 
 # ---------------------------------------------------------
