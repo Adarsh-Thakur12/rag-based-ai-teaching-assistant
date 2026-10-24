@@ -1,5 +1,6 @@
 from pathlib import Path
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import (
     APIRouter,
@@ -304,8 +305,46 @@ def retry_lecture(
     }
 
 # ---------------------------------------------------------
+# INSPECT POTENTIALLY STALE LECTURES
+# ---------------------------------------------------------
+
+@router.get("/stale")
+def get_stale_lectures(
+    current_user=Depends(get_current_user)
+):
+    user_id = str(current_user.id)
+
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(minutes=60)
+    ).isoformat()
+
+    response = (
+        supabase
+        .table("lectures")
+        .select(
+            "id, title, status, processing_started_at"
+        )
+        .eq("user_id", user_id)
+        .in_(
+            "status",
+            ["processing", "transcribing", "embedding"]
+        )
+        .lt("processing_started_at", cutoff)
+        .execute()
+    )
+
+    return {
+        "stale_candidates": response.data or [],
+        "message": (
+            "These lectures may need investigation. "
+            "They have not been modified."
+        )
+    }
+
+# ---------------------------------------------------------
 # GET SINGLE LECTURE
 # ---------------------------------------------------------
+
 
 @router.get("/{lecture_id}")
 def get_lecture(
